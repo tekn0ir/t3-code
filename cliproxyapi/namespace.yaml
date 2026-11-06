@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cliproxy
+  labels:
+    # No sidecar, like teknoir-ci: the ingress gateway reaches the pod with auto mTLS falling
+    # back to plain text, and `kubectl port-forward` for the OAuth callbacks stays simple.
+    istio-injection: disabled

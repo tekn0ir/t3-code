@@ -1,0 +1,31 @@
+# Reference copy of the Application that the gitops repo renders
+# (platform-applications-gitops: charts/app-of-apps/templates/cliproxyapi.yaml, gated by
+# cliproxy.enabled, teknoir-cloud only). Edit it there; this file documents what gets applied
+# and can be applied by hand for a quick test outside the app-of-apps.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cliproxyapi
+  namespace: teknoir-system
+spec:
+  project: teknoir-cloud
+  destination:
+    namespace: cliproxy
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/tekn0ir/t3-code
+    path: deploy/cliproxyapi
+    targetRevision: main
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
+      enabled: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
