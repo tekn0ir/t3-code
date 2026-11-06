@@ -1,8 +1,6 @@
-# https://cliproxy.teknoir.cloud -> cliproxyapi:8317 (API, /management.html, Codex websockets).
-# teknoir-gateway already serves *.teknoir.cloud with the wildcard certificate.
-# The edge oauth2-proxy is skipped for this host via istio.bypassAuth in the gitops auth chart;
-# the proxy's own API key and management secret protect it, and authorizationpolicy.yaml
-# limits it to the LAN.
+# https://cliproxy.teknoir.cloud:8317 -> cliproxyapi:8317 (API, /management.html, Codex websockets).
+# Bound ONLY to the LAN listener (gateway.yaml). Do not add istio-system/teknoir-gateway here:
+# that is the internet-facing :443 listener.
 apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
@@ -12,7 +10,7 @@ spec:
   hosts:
     - cliproxy.teknoir.cloud
   gateways:
-    - istio-system/teknoir-gateway
+    - cliproxy/cliproxy-lan
   http:
     - name: cliproxyapi
       route:
@@ -20,7 +18,6 @@ spec:
             host: cliproxyapi.cliproxy.svc.cluster.local
             port:
               number: 8317
-      # Streaming completions and Codex websocket sessions run long; no route timeout.
-      timeout: 0s
-      # Istio proxies the HTTP/1.1 websocket upgrade on every route by default; nothing
-      # else is needed for Codex (`/v1/responses` over ws).
+      # No `timeout`: Istio sets none by default, which long streaming completions and Codex
+      # websocket sessions need (this Istio rejects an explicit 0s). Istio proxies the HTTP/1.1
+      # websocket upgrade on every route by default.

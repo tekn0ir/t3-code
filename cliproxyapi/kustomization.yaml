@@ -5,17 +5,16 @@ kind: Kustomization
 # (deploy/argocd/cliproxyapi-app.yaml, created by scripts/bootstrap-argocd.sh). The config
 # Secret `cliproxyapi-config` is NOT part of this kustomization: apply it out-of-band from
 # secret.example.yaml (see README.md).
-# No top-level `namespace:`: the AuthorizationPolicy and the EnvoyFilter act on the ingress
-# gateway and must stay in istio-system, so each resource names its own namespace.
+# No top-level `namespace:`: the cliproxy-lan Service (gateway.yaml) selects the ingress gateway
+# pods and must stay in istio-system, so each resource names its own namespace.
 
 resources:
   - namespace.yaml
   - pvc.yaml
   - deployment.yaml
   - service.yaml
+  - gateway.yaml
   - virtualservice.yaml
-  - authorizationpolicy.yaml
-  - envoyfilter-bypass-auth.yaml
 
 labels:
   - pairs:
