@@ -153,6 +153,22 @@ Open the printed `http://<host>:3773/pair#token=...` in that device's browser, o
 **Add environment** in the T3 desktop or mobile app. One client can hold both hosts. Revoke a
 device under **Settings → Sharing & access** on that host.
 
+#### Hub models in T3 (DeepSeek Flash)
+
+Each dev host also has a T3 provider **DeepSeek Flash (hub)** (`deepseek-hub`): Claude Code driven
+by T3, pointed at the hub with every model role mapped to `deepseek-flash`. It has its own
+`CLAUDE_CONFIG_DIR` (`~/.claude-hub`), so it never sees the host's claude.ai login, and the host's
+own `claude` processes (the Remote Control services) are untouched. Pick it in the T3 model picker.
+
+```bash
+./scripts/t3-hub-provider.sh anders@teknoir.airgapped          # add or update
+./scripts/t3-hub-provider.sh --remove anders@delegated.local   # remove
+./scripts/t3-hub-provider.sh --model deepseek-v4-pro --id deepseek-pro-hub --name "DeepSeek Pro (hub)" anders@teknoir.airgapped
+```
+
+T3 reloads `settings.json` live. The driver id is `claudeAgent` (T3 shows "Driver 'claude' is not
+registered" for `claude`).
+
 ## Secrets
 
 Nothing secret is committed: the hub's `config.yaml` lives only in the `cliproxyapi-config` Secret,
