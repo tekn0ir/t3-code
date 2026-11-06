@@ -117,6 +117,38 @@ It writes `~/.claude/settings.json` (`env.ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_
 into existing settings) and `~/.codex/config.toml` (a `cliproxy` Responses provider set as the
 default), backing up both first. Re-running is safe.
 
+**`settings.json` is global:** every `claude` the user runs on that machine then goes through the
+hub, including Claude Code Remote Control services, which need their own claude.ai login. On such
+hosts use `--no-hub` (leaves both files alone) until the hub is in use there.
+
+### Dev hosts (set up 2026-11-06)
+
+Fully contained: LAN or VPN only, T3 Connect off, one systemd user service per host
+(`t3code.service`, lingering on, listening on `:3773`, pairing code is the lock). Projects are the
+folders the existing Claude Remote Control services work in:
+
+| Host | Address | Projects |
+|---|---|---|
+| teknoir.airgapped | `http://192.168.2.181:3773` | `~/git/ai`, `~/git/rbc` |
+| delegated.local | `http://192.168.2.204:3773` | `~/git/delegated`, `~/git/redbluecorner` |
+
+Re-run (idempotent) from this repo:
+
+```bash
+scp scripts/install-t3.sh anders@teknoir.airgapped:/tmp/ && ssh anders@teknoir.airgapped 'bash -lc "bash /tmp/install-t3.sh --no-hub --service --project ~/git/ai --project ~/git/rbc"'
+scp scripts/install-t3.sh anders@delegated.local:/tmp/ && ssh anders@delegated.local 'bash -lc "bash /tmp/install-t3.sh --no-hub --service --project ~/git/delegated --project ~/git/redbluecorner"'
+```
+
+Pair a new device (one-time link per device and host; default lifetime 5 minutes):
+
+```bash
+ssh anders@teknoir.airgapped '~/.local/bin/t3 pair --ttl 1h --label <device>'
+```
+
+Open the printed `http://<host>:3773/pair#token=...` in that device's browser, or paste it into
+**Add environment** in the T3 desktop or mobile app. One client can hold both hosts. Revoke a
+device under **Settings → Sharing & access** on that host.
+
 ## Secrets
 
 Nothing secret is committed: the hub's `config.yaml` lives only in the `cliproxyapi-config` Secret,

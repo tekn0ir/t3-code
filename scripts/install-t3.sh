@@ -11,6 +11,11 @@
 #   --service        After configuring, install the T3 Code background service with LAN access
 #                    (`t3 up --lan --no-connect --yes`).
 #   --skip-install   Only (re)write the configs; do not install or check t3/claude/codex.
+#   --no-hub         Do not touch ~/.claude/settings.json or ~/.codex/config.toml (no API key
+#                    needed). Use it on hosts where other Claude Code processes, such as Remote
+#                    Control services, must keep their own claude.ai login: settings.json is
+#                    global to every `claude` the user runs.
+#   --project PATH   With --service: register PATH as a T3 project (`t3 project add`). Repeatable.
 #   --hub URL        Hub base URL (default $CLIPROXY_URL or https://cliproxy.teknoir.cloud:8317).
 #   -h, --help       Show this help.
 #
@@ -29,6 +34,8 @@ HUB_URL="${CLIPROXY_URL:-https://cliproxy.teknoir.cloud:8317}"
 DRY_RUN=0
 SERVICE=0
 SKIP_INSTALL=0
+NO_HUB=0
+PROJECTS=()
 STAMP="$(date +%Y%m%d-%H%M%S)"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 CODEX_CONFIG="${HOME}/.codex/config.toml"
@@ -58,6 +65,9 @@ parse_args() {
       --dry-run) DRY_RUN=1 ;;
       --service) SERVICE=1 ;;
       --skip-install) SKIP_INSTALL=1 ;;
+      --no-hub) NO_HUB=1 ;;
+      --project) [ $# -ge 2 ] || die "--project needs a path"; PROJECTS+=("$2"); shift ;;
+      --project=*) PROJECTS+=("${1#--project=}") ;;
       --hub) [ $# -ge 2 ] || die "--hub needs a URL"; HUB_URL="$2"; shift ;;
       --hub=*) HUB_URL="${1#--hub=}" ;;
       -h|--help) usage; exit 0 ;;
@@ -129,8 +139,16 @@ install_codex() {
     return
   fi
   if have npm; then
-    log "installing codex with npm"
-    run npm install -g @openai/codex
+    local prefix
+    prefix="$(npm config get prefix 2>/dev/null || echo /usr)"
+    if [ -w "${prefix}/lib" ] || [ -w "${prefix}" ]; then
+      log "installing codex with npm"
+      run npm install -g @openai/codex
+    else
+      # System Node (e.g. /usr): install into ~/.local instead of needing sudo.
+      log "installing codex with npm into ${HOME}/.local (npm prefix ${prefix} is not writable)"
+      run npm install -g --prefix "${HOME}/.local" @openai/codex
+    fi
   elif [ "$OS" = macos ] && have brew; then
     log "installing codex with Homebrew"
     run brew install codex
@@ -272,6 +290,35 @@ check_hub() {
 install_service() {
   log "installing the T3 Code background service with LAN access"
   run t3 up --lan --no-connect --yes
+  local p
+  for p in ${PROJECTS[@]+"${PROJECTS[@]}"}; do
+    if [ ! -d "$p" ]; then
+      warn "project folder ${p} does not exist; skipped"
+      continue
+    fi
+    log "registering project ${p}"
+    if [ "$DRY_RUN" = 1 ]; then
+      printf '[dry-run] t3 project add %s\n' "$p" >&2
+      continue
+    fi
+    # The service may still be restarting right after `t3 up`; retry anything but a duplicate.
+    local out=""
+    for _ in 1 2 3 4 5 6; do
+      if out="$(t3 project add "$p" 2>&1)"; then
+        out=ok
+        break
+      fi
+      case "$out" in
+        *ProjectAlreadyExistsError*) out=exists; break ;;
+      esac
+      sleep 3
+    done
+    case "$out" in
+      ok) ;;
+      exists) log "project ${p} already registered" ;;
+      *) warn "t3 project add ${p} failed: $(printf '%s\n' "$out" | grep -vE '^[[:space:]]+at ' | head -3)" ;;
+    esac
+  done
 }
 
 main() {
@@ -283,10 +330,17 @@ main() {
     install_claude
     install_codex
   fi
-  read_api_key
-  write_claude_settings
-  write_codex_config
-  check_hub
+  if [ "$NO_HUB" = 1 ]; then
+    log "--no-hub: leaving ~/.claude/settings.json and ~/.codex/config.toml unchanged"
+  else
+    read_api_key
+    write_claude_settings
+    write_codex_config
+    check_hub
+  fi
+  if [ "${#PROJECTS[@]}" -gt 0 ] && [ "$SERVICE" = 0 ]; then
+    warn "--project only applies with --service; ignored"
+  fi
   if [ "$SERVICE" = 1 ]; then
     install_service
   fi
