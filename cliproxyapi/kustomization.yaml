@@ -1,11 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# CLIProxyAPI on r415, synced by the gitops Application `cliproxyapi`
-# (deploy/argocd/cliproxyapi-app.yaml). The config Secret `cliproxyapi-config` is NOT part of
-# this kustomization: apply it out-of-band from secret.example.yaml (see README.md).
-# No top-level `namespace:`: authorizationpolicy.yaml must stay in istio-system, so each
-# resource names its own namespace.
+# CLIProxyAPI on r415, synced by the self-contained Argo CD Application `cliproxyapi`
+# (deploy/argocd/cliproxyapi-app.yaml, created by scripts/bootstrap-argocd.sh). The config
+# Secret `cliproxyapi-config` is NOT part of this kustomization: apply it out-of-band from
+# secret.example.yaml (see README.md).
+# No top-level `namespace:`: the AuthorizationPolicy and the EnvoyFilter act on the ingress
+# gateway and must stay in istio-system, so each resource names its own namespace.
 
 resources:
   - namespace.yaml
@@ -14,6 +15,7 @@ resources:
   - service.yaml
   - virtualservice.yaml
   - authorizationpolicy.yaml
+  - envoyfilter-bypass-auth.yaml
 
 labels:
   - pairs:
