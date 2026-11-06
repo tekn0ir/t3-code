@@ -169,6 +169,20 @@ own `claude` processes (the Remote Control services) are untouched. Pick it in t
 T3 reloads `settings.json` live. The driver id is `claudeAgent` (T3 shows "Driver 'claude' is not
 registered" for `claude`).
 
+#### T3 Desktop on the Mac: hub only
+
+The desktop app's own (local) environment uses nothing but the hub:
+
+```bash
+./scripts/t3-hub-provider.sh --local --exclusive
+```
+
+`--exclusive` adds the hub instance, disables every built-in provider (Codex, Claude, Cursor, Grok,
+fx, OpenCode, Antigravity, Kiro, Pi, Muse) and points the default, fallback, text-generation
+(thread titles, branch names) and source-control writer models at `deepseek-hub`. Undo with
+`--local --exclusive --remove`. This covers the Mac's local environment only; the dev hosts you
+connect to keep their own provider settings.
+
 ## Secrets
 
 Nothing secret is committed: the hub's `config.yaml` lives only in the `cliproxyapi-config` Secret,
