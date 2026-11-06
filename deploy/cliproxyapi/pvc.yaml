@@ -1,0 +1,13 @@
+# OAuth account logins (/root/.cli-proxy-api). local-path binds to the node the pod first runs
+# on, which is always r415 (nodeSelector in deployment.yaml).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cliproxyapi-auths
+  namespace: cliproxy
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cliproxyapi
+  namespace: cliproxy
+spec:
+  replicas: 1
+  # One writer for the RWO local-path volume: stop the old pod before starting the new one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: cliproxyapi
+  template:
+    metadata:
+      labels:
+        app: cliproxyapi
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: r415
+      # CLIProxyAPI rewrites its config file (it hashes a plaintext management secret on start
+      # and the management UI saves edits), so it cannot run from the read-only Secret mount.
+      # Copy the Secret into a writable emptyDir on every start: the Secret stays the source of
+      # truth, and UI edits last until the next restart (put lasting changes in the Secret).
+      initContainers:
+        - name: config
+          image: busybox:1.37
+          command: ["sh", "-c", "cp /secret/config.yaml /config/config.yaml && chmod 600 /config/config.yaml"]
+          volumeMounts:
+            - name: config-secret
+              mountPath: /secret
+              readOnly: true
+            - name: config
+              mountPath: /config
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 32Mi}
+      containers:
+        - name: cliproxyapi
+          image: cliproxyapi
+          imagePullPolicy: IfNotPresent
+          command: ["./CLIProxyAPI"]
+          args: ["-config", "/config/config.yaml"]
+          env:
+            - name: TZ
+              value: Europe/Stockholm
+          ports:
+            - name: http
+              containerPort: 8317
+            # OAuth callbacks, reached only via `kubectl port-forward` (scripts/login-accounts.md).
+            - name: claude-oauth
+              containerPort: 54545
+            - name: codex-oauth
+              containerPort: 1455
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 4
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: auths
+              mountPath: /root/.cli-proxy-api
+            - name: logs
+              mountPath: /CLIProxyAPI/logs
+      volumes:
+        - name: config-secret
+          secret:
+            secretName: cliproxyapi-config
+        - name: config
+          emptyDir: {}
+        - name: auths
+          persistentVolumeClaim:
+            claimName: cliproxyapi-auths
+        - name: logs
+          emptyDir:
+            sizeLimit: 1Gi

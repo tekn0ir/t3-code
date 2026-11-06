@@ -1,0 +1,8 @@
+[submodule "src/cliproxyapi"]
+	path = src/cliproxyapi
+	url = https://github.com/tekn0ir/CLIProxyAPI.git
+	branch = main
+[submodule "src/t3code"]
+	path = src/t3code
+	url = https://github.com/tekn0ir/t3code.git
+	branch = main
