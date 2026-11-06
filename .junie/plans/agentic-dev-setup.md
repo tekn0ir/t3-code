@@ -108,6 +108,12 @@ Images for both projects can be built locally and are pushed to GHCR from GitHub
 - Validate with `kustomize build` and `kubeconform`.
 
 ###   Step 4: Wire into ArgoCD gitops repo
+> **Revised 2026-11-06: self-contained, no gitops repo change.** The Application lives in
+> `deploy/argocd/cliproxyapi-app.yaml` and is created once with `scripts/bootstrap-argocd.sh`
+> (break-glass on `teknoir-system`, because the gitops release guard denies hand-made Application
+> writes). The `istio.bypassAuth` entry is replaced by `deploy/cliproxyapi/envoyfilter-bypass-auth.yaml`.
+> The points below describe the original, abandoned approach.
+
 A feature branch in the gitops repo deploys the proxy from this repo.
 - Add the Application manifest pointing at `deploy/cliproxyapi`, gated with `cliproxy.enabled` in app-of-apps.
 - Add the host to `istio.bypassAuth` in `charts/auth/values.yaml`.

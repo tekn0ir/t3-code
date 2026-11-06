@@ -1,12 +1,21 @@
-# Reference copy of the Application that the gitops repo renders
-# (platform-applications-gitops: charts/app-of-apps/templates/cliproxyapi.yaml, gated by
-# cliproxy.enabled, teknoir-cloud only). Edit it there; this file documents what gets applied
-# and can be applied by hand for a quick test outside the app-of-apps.
+# The Argo CD Application for the hub. Self-contained: it is NOT rendered by the gitops
+# app-of-apps (teknoir/platform-applications-gitops) and does not follow its staging releases.
+# Create it once with scripts/bootstrap-argocd.sh; from then on Argo CD syncs deploy/cliproxyapi
+# from this repository's `main` on its own.
+#
+# The gitops release guard (ValidatingAdmissionPolicy staging-release-guard) denies hand-made
+# CREATE/UPDATE/DELETE of Applications, so creating or changing THIS object needs break-glass on
+# the teknoir-system Namespace (the bootstrap script does that and closes it again). Argo CD's own
+# syncs are not affected: the application controller is an excluded identity.
+#
+# The root app-of-apps does not prune it: it only prunes the Applications it rendered itself.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: cliproxyapi
   namespace: teknoir-system
+  labels:
+    app.kubernetes.io/part-of: t3-code
 spec:
   project: teknoir-cloud
   destination:

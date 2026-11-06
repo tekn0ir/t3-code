@@ -17,9 +17,11 @@ src/t3code/                      submodule: github.com/tekn0ir/t3code      (fork
 docker/cliproxyapi/Dockerfile    proxy image, built from src/cliproxyapi
 docker/t3code/Dockerfile         optional `t3 serve --lan` image (t3 + git + claude + codex)
 .github/workflows/images.yml     builds/pushes ghcr.io/tekn0ir/{cliproxyapi,t3code}
-deploy/cliproxyapi/              kustomize: namespace, Deployment, PVC, Service, VirtualService, AuthorizationPolicy
+deploy/cliproxyapi/              kustomize: namespace, Deployment, PVC, Service, VirtualService,
+                                 AuthorizationPolicy (LAN-only), EnvoyFilter (skip the edge login)
 deploy/cliproxyapi/secret.example.yaml   config.yaml template (applied out-of-band, never committed)
-deploy/argocd/cliproxyapi-app.yaml       reference copy of the gitops Application
+deploy/argocd/cliproxyapi-app.yaml       the Argo CD Application (self-contained, created once)
+scripts/bootstrap-argocd.sh      creates that Application under release-guard break-glass
 scripts/install-t3.sh            one-command T3 Code installer/configurator
 scripts/login-accounts.md        signing Claude/Codex accounts in to the hub
 ```
@@ -57,11 +59,25 @@ make the packages public (or add a pull secret) and pin `newTag` in
    kubectl --context r415 create namespace cliproxy --dry-run=client -o yaml | kubectl --context r415 apply -f -
    kubectl --context r415 apply -f deploy/cliproxyapi/secret.yaml
    ```
-2. **Argo CD**: the gitops repo (`platform-applications-gitops`, branch `cliproxyapi`) adds the
-   `cliproxyapi` Application (`cliproxy.enabled`, teknoir-cloud only) and the
-   `cliproxy.teknoir.cloud:443` entry in `istio.bypassAuth`. It ships through the normal staging
-   release. The Application follows `cliproxy.targetRevision` of this repo (default `main`).
+2. **Argo CD** (once): everything lives in this repo; the gitops repo
+   (`teknoir/platform-applications-gitops`) is not changed and its staging releases do not carry
+   the hub.
+   ```bash
+   ./scripts/bootstrap-argocd.sh --dry-run
+   ./scripts/bootstrap-argocd.sh
+   ```
+   That creates `teknoir-system/cliproxyapi` (project `teknoir-cloud`), which from then on syncs
+   `deploy/cliproxyapi` from `main` here, auto-prune and self-heal. The gitops release guard
+   denies hand-made Application writes, so the script opens break-glass on `teknoir-system`
+   for the apply and closes it again; re-run it whenever `deploy/argocd/cliproxyapi-app.yaml`
+   changes. Argo CD's own syncs need no break-glass.
 3. **Accounts**: see [scripts/login-accounts.md](scripts/login-accounts.md).
+
+The edge login (oauth2-proxy) is skipped for the host by
+[envoyfilter-bypass-auth.yaml](deploy/cliproxyapi/envoyfilter-bypass-auth.yaml), the same
+per-vhost patch the gitops auth chart renders for its `istio.bypassAuth` entries. It depends on
+that chart's filter names (`envoy.filters.http.ext_authz`, `envoy.filters.http.lua`): after an
+auth chart upgrade, check that bearer calls still get 200 and not a 302 to `/oauth2/start`.
 
 Check from the LAN:
 

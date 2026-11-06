@@ -1,0 +1,38 @@
+# Skip the edge login (oauth2-proxy ext_authz + the Lua login redirect) for cliproxy.teknoir.cloud.
+#
+# The gitops auth chart (teknoir/platform-applications-gitops charts/auth, EnvoyFilter
+# oauth2-proxy-ext-authz) puts both filters on every teknoir-gateway vhost. Claude Code and Codex
+# call the hub with a bearer API key, which ext_authz would reject and the Lua filter would turn
+# into a 302 to /oauth2/start. This is the same per-vhost patch the auth chart renders for its
+# istio.bypassAuth entries, kept here so this repo needs no change in the gitops repo.
+#
+# The hub authenticates callers itself (access.api-keys, management.secret-key), and
+# authorizationpolicy.yaml limits the host to the LAN. If the auth chart ever renames its filters,
+# this patch silently stops matching; check after auth chart upgrades.
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: cliproxyapi-bypass-edge-auth
+  namespace: istio-system
+spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+  configPatches:
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: GATEWAY
+        routeConfiguration:
+          gateway: istio-system/teknoir-gateway
+          vhost:
+            name: cliproxy.teknoir.cloud:443
+      patch:
+        operation: MERGE
+        value:
+          typed_per_filter_config:
+            envoy.filters.http.ext_authz:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+              disabled: true
+            envoy.filters.http.lua:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+              disabled: true
