@@ -1,5 +1,16 @@
 # Signing accounts in to CLIProxyAPI on r415
 
+> **Read before signing in a subscription account.** Anthropic's
+> [Claude Code legal and compliance terms](https://code.claude.com/docs/en/legal-and-compliance)
+> say Claude Free/Pro/Max/Ultra OAuth is for ordinary use of Claude Code and Anthropic's own apps,
+> and that credentials and session tokens may not be collected, stored or intermediated outside
+> Anthropic's flow; Anthropic may enforce this without notice. A Claude login here does exactly
+> that: the hub stores the OAuth token and, by default, disguises other clients' requests as
+> Claude Code (`disable-claude-cloak-mode: false`). It also cloaks Codex/ChatGPT logins by default
+> (`disable-codex-cloaking: false`); check OpenAI's terms the same way. **For Claude use an
+> Anthropic Console API key** (`api-keys.claude` in the config Secret) instead of a login, and add
+> other providers by API key (`api-keys.*`, `openai-compatibility` for DeepSeek, OpenRouter, ...).
+
 The OAuth providers redirect your browser to a **localhost** callback:
 
 | Provider | Callback | Container port |
@@ -25,13 +36,14 @@ Keep this running in its own terminal during the login:
 kubectl --context r415 -n cliproxy port-forward deploy/cliproxyapi 54545:54545 1455:1455 8317:8317
 ```
 
-(8317 is optional: it lets you use the dashboard at `http://localhost:8317/management.html`
-even when DNS for `cliproxy.teknoir.cloud` isn't set up yet.)
+All three are needed for a dashboard login: the pod's forwarder on 54545/1455 receives the
+provider's redirect and sends your browser on to `http://127.0.0.1:8317/v0/management/oauth-callback`,
+which only reaches the pod through the 8317 forward.
 
-## 2a. Log in from the dashboard (recommended)
+## 2a. Log in from the dashboard
 
-1. Open `https://cliproxy.teknoir.cloud:8317/management.html` (or `http://localhost:8317/management.html`)
-   and enter the management secret.
+1. Open `http://localhost:8317/management.html` (through the port-forward, so the whole flow stays
+   on one origin) and enter the management secret.
 2. Go to **OAuth / Auth files**, pick Claude or Codex, and open the login link in the **same**
    machine's browser that runs the port-forward.
 3. After the provider redirects to `localhost:<port>`, the port-forward delivers the callback to the
