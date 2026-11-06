@@ -1,0 +1,42 @@
+name: deploy-branch
+
+# Publishes deploy/ to the `deploy` branch (git subtree split), which Argo CD syncs.
+#
+# Why: Argo CD on r415 has git submodules enabled, so syncing from main would recursively check
+# out src/cliproxyapi and src/t3code. That is slow (t3code is large) and fails outright, because
+# upstream t3code carries a nested submodule with no URL in its .gitmodules. The `deploy` branch
+# holds only the contents of deploy/ (no .gitmodules), so Argo has nothing to recurse into.
+#
+# The split is deterministic, so each run fast-forwards the branch; never commit to it by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/deploy-branch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-branch
+  cancel-in-progress: false
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Split deploy/ and push to the deploy branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          split="$(git subtree split --prefix=deploy HEAD)"
+          echo "deploy/ at ${GITHUB_SHA::7} -> ${split}"
+          git push origin "${split}:refs/heads/deploy"
+          echo "### deploy branch -> \`${split}\` (from ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"

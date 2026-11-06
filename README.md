@@ -17,6 +17,7 @@ src/t3code/                      submodule: github.com/tekn0ir/t3code      (fork
 docker/cliproxyapi/Dockerfile    proxy image, built from src/cliproxyapi
 docker/t3code/Dockerfile         optional `t3 serve --lan` image (t3 + git + claude + codex)
 .github/workflows/images.yml     builds/pushes ghcr.io/tekn0ir/{cliproxyapi,t3code}
+.github/workflows/deploy-branch.yml  publishes deploy/ to the `deploy` branch that Argo CD syncs
 deploy/cliproxyapi/              kustomize: namespace, Deployment, PVC, Service, VirtualService,
                                  LAN-only Gateway + LoadBalancer on :8317
 deploy/cliproxyapi/secret.example.yaml   config.yaml template (applied out-of-band, never committed)
@@ -67,7 +68,10 @@ make the packages public (or add a pull secret) and pin `newTag` in
    ./scripts/bootstrap-argocd.sh
    ```
    That creates `teknoir-system/cliproxyapi` (project `teknoir-cloud`), which from then on syncs
-   `deploy/cliproxyapi` from `main` here, auto-prune and self-heal. The gitops release guard
+   `cliproxyapi/` from the **`deploy` branch** here, auto-prune and self-heal. That branch is
+   `deploy/` split out of `main` by [deploy-branch.yml](.github/workflows/deploy-branch.yml) on
+   every push touching `deploy/`; never commit to it by hand. (Argo CD on r415 checks out git
+   submodules recursively, and `src/t3code` breaks that, so it must not sync from `main`.) The gitops release guard
    denies hand-made Application writes, so the script opens break-glass on `teknoir-system`
    for the apply and closes it again; re-run it whenever `deploy/argocd/cliproxyapi-app.yaml`
    changes. Argo CD's own syncs need no break-glass.
