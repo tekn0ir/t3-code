@@ -31,6 +31,10 @@ Set up a LAN-only, home-hosted agentic dev environment so you can test several m
 - Account logins are stored on a persistent volume, so they survive restarts.
 - Config follows Theo's guide: round-robin routing, session affinity with a 1h TTL, an API key, and a management secret.
 - `https://cliproxy.teknoir.cloud` serves the API and `/management.html`, from LAN source IPs only.
+  > **Revised 2026-11-06:** served at `https://cliproxy.teknoir.cloud:8317` on a dedicated
+  > ingress listener that the router does not forward (`deploy/cliproxyapi/gateway.yaml`), not on
+  > `teknoir-gateway:443` with an IP allowlist: the k3s ServiceLB rewrites client IPs and the LAN
+  > spans 192.168.1.0/24 and 192.168.2.0/24. LAN DNS must map the name to 192.168.2.166.
 - `scripts/install-t3.sh` works on Linux and macOS. It installs `t3`, `claude` and `codex`, and writes `~/.claude/settings.json` and `~/.codex/config.toml` pointing at the hub. It backs up any existing files first.
 - `docker/t3code` provides an optional container image for running `t3 serve --lan`.
 

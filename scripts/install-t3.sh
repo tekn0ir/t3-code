@@ -11,7 +11,7 @@
 #   --service        After configuring, install the T3 Code background service with LAN access
 #                    (`t3 up --lan --no-connect --yes`).
 #   --skip-install   Only (re)write the configs; do not install or check t3/claude/codex.
-#   --hub URL        Hub base URL (default $CLIPROXY_URL or https://cliproxy.teknoir.cloud).
+#   --hub URL        Hub base URL (default $CLIPROXY_URL or https://cliproxy.teknoir.cloud:8317).
 #   -h, --help       Show this help.
 #
 # Environment:
@@ -25,7 +25,7 @@
 # hub provider block is replaced and everything else is kept.
 set -euo pipefail
 
-HUB_URL="${CLIPROXY_URL:-https://cliproxy.teknoir.cloud}"
+HUB_URL="${CLIPROXY_URL:-https://cliproxy.teknoir.cloud:8317}"
 DRY_RUN=0
 SERVICE=0
 SKIP_INSTALL=0
@@ -263,8 +263,8 @@ check_hub() {
   case "$code" in
     200) log "hub reachable: ${HUB_URL}/v1/models -> 200" ;;
     401) warn "hub answered 401: the API key is not in the hub's access.api-keys" ;;
-    403) warn "hub answered 403: this machine is not on the LAN (AuthorizationPolicy)" ;;
-    000) warn "hub not reachable at ${HUB_URL} (DNS, network or TLS); configs are written anyway" ;;
+    403) warn "hub answered 403 for /v1/models" ;;
+    000) warn "hub not reachable at ${HUB_URL}: on the LAN, cliproxy.teknoir.cloud must resolve to 192.168.2.166 (router DNS override or /etc/hosts); configs are written anyway" ;;
     *) warn "hub answered HTTP ${code} for /v1/models" ;;
   esac
 }

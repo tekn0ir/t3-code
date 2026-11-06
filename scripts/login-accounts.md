@@ -30,7 +30,7 @@ even when DNS for `cliproxy.teknoir.cloud` isn't set up yet.)
 
 ## 2a. Log in from the dashboard (recommended)
 
-1. Open `https://cliproxy.teknoir.cloud/management.html` (or `http://localhost:8317/management.html`)
+1. Open `https://cliproxy.teknoir.cloud:8317/management.html` (or `http://localhost:8317/management.html`)
    and enter the management secret.
 2. Go to **OAuth / Auth files**, pick Claude or Codex, and open the login link in the **same**
    machine's browser that runs the port-forward.
@@ -56,7 +56,7 @@ running.
 
 ```bash
 kubectl --context r415 -n cliproxy exec deploy/cliproxyapi -- ls -l /root/.cli-proxy-api
-curl -s https://cliproxy.teknoir.cloud/v1/models -H "Authorization: Bearer $CLIPROXY_API_KEY" | head
+curl -s https://cliproxy.teknoir.cloud:8317/v1/models -H "Authorization: Bearer $CLIPROXY_API_KEY" | head
 ```
 
 ## Backup

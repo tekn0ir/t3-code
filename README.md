@@ -3,7 +3,7 @@
 A home-hosted, LAN-only agentic dev setup for testing several models reviewing each other's work:
 
 - **CLIProxyAPI** (the hub) runs on the `r415` K3s cluster, is deployed by Argo CD, and is
-  reachable from the LAN at `https://cliproxy.teknoir.cloud` (API and `/management.html`).
+  reachable only from the LAN at `https://cliproxy.teknoir.cloud:8317` (API and `/management.html`).
 - **T3 Code** installs with one command on `teknoir.airgapped`, `delegated.local` and the Mac
   laptop, with Claude Code and Codex pre-wired to the hub.
 
@@ -18,7 +18,7 @@ docker/cliproxyapi/Dockerfile    proxy image, built from src/cliproxyapi
 docker/t3code/Dockerfile         optional `t3 serve --lan` image (t3 + git + claude + codex)
 .github/workflows/images.yml     builds/pushes ghcr.io/tekn0ir/{cliproxyapi,t3code}
 deploy/cliproxyapi/              kustomize: namespace, Deployment, PVC, Service, VirtualService,
-                                 AuthorizationPolicy (LAN-only), EnvoyFilter (skip the edge login)
+                                 LAN-only Gateway + LoadBalancer on :8317
 deploy/cliproxyapi/secret.example.yaml   config.yaml template (applied out-of-band, never committed)
 deploy/argocd/cliproxyapi-app.yaml       the Argo CD Application (self-contained, created once)
 scripts/bootstrap-argocd.sh      creates that Application under release-guard break-glass
@@ -73,33 +73,37 @@ make the packages public (or add a pull secret) and pin `newTag` in
    changes. Argo CD's own syncs need no break-glass.
 3. **Accounts**: see [scripts/login-accounts.md](scripts/login-accounts.md).
 
-The edge login (oauth2-proxy) is skipped for the host by
-[envoyfilter-bypass-auth.yaml](deploy/cliproxyapi/envoyfilter-bypass-auth.yaml), the same
-per-vhost patch the gitops auth chart renders for its `istio.bypassAuth` entries. It depends on
-that chart's filter names (`envoy.filters.http.ext_authz`, `envoy.filters.http.lua`): after an
-auth chart upgrade, check that bearer calls still get 200 and not a 302 to `/oauth2/start`.
+## LAN-only exposure
 
-Check from the LAN:
+The hub is **not** on the internet-facing `teknoir-gateway:443`. It has its own listener on the
+existing ingress gateway pods, `https://cliproxy.teknoir.cloud:8317`
+([gateway.yaml](deploy/cliproxyapi/gateway.yaml)), opened on r415 by a LoadBalancer Service:
+
+- The router forwards only the platform ports (80, 443, MQTT, TURN) to r415, so `:8317` cannot be
+  reached from the internet. This is the only thing keeping it LAN-only: **never forward 8317 on
+  the router.**
+- It does not depend on client IPs. The k3s ServiceLB with `externalTrafficPolicy: Cluster`
+  rewrites them, and the LAN spans more than one subnet (`192.168.1.0/24`, `192.168.2.0/24`), so an
+  IP allowlist at the gateway would be unreliable.
+- The edge login (oauth2-proxy) runs only on the `:443` listener, so nothing needs bypassing; the
+  hub's own API key and management secret authenticate every call. `cliproxy.teknoir.cloud` on
+  `:443` has no route.
+- TLS uses the existing `*.teknoir.cloud` wildcard certificate.
+
+### DNS
+
+`cliproxy.teknoir.cloud` matches the public wildcard and resolves to the WAN address, where
+`:8317` is closed. On the LAN it must resolve to r415, `192.168.2.166`. Either:
+
+- **Router (recommended):** add a host override `cliproxy.teknoir.cloud -> 192.168.2.166` in the
+  DNS of the router `192.168.1.1` (it already answers for `r415`); or
+- **Per machine:** `echo '192.168.2.166 cliproxy.teknoir.cloud' | sudo tee -a /etc/hosts`.
+
+Check from the LAN, and once from outside (phone on mobile data, expect a timeout):
 
 ```bash
-curl https://cliproxy.teknoir.cloud/v1/models -H "Authorization: Bearer $CLIPROXY_API_KEY"
+curl https://cliproxy.teknoir.cloud:8317/v1/models -H "Authorization: Bearer $CLIPROXY_API_KEY"
 ```
-
-### LAN filter (verify before relying on it)
-
-`teknoir.cloud` resolves publicly, so `cliproxy.teknoir.cloud` is reachable from the internet
-unless the AuthorizationPolicy stops it. The policy denies any client IP outside
-`192.168.2.0/24` at the ingress gateway, but that only works if the gateway sees the real client IP.
-With the k3s ServiceLB and `externalTrafficPolicy: Cluster` (the istio chart default) the source is
-rewritten, so check both directions after the first sync:
-
-- from the LAN, `/v1/models` returns 200;
-- from outside (e.g. phone on mobile data), it returns 403.
-
-If the LAN gets 403, the gateway sees a rewritten address: set `externalTrafficPolicy: Local` on
-`istio-ingressgateway` (gitops `charts/istio`) or add the node/svclb address to the policy only
-together with another way of keeping outside traffic off this host (e.g. split DNS to
-`192.168.2.166` and no public DNS for `cliproxy`).
 
 ## T3 Code on a dev machine
 

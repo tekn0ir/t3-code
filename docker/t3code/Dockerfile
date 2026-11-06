@@ -2,8 +2,8 @@
 #
 #   docker build -t t3code docker/t3code --build-arg T3CODE_VERSION=0.1.7
 #   docker run -p 3773:3773 \
-#     -e ANTHROPIC_BASE_URL=https://cliproxy.teknoir.cloud -e ANTHROPIC_AUTH_TOKEN=... \
-#     -e OPENAI_BASE_URL=https://cliproxy.teknoir.cloud/v1 -e OPENAI_API_KEY=... \
+#     -e ANTHROPIC_BASE_URL=https://cliproxy.teknoir.cloud:8317 -e ANTHROPIC_AUTH_TOKEN=... \
+#     -e OPENAI_BASE_URL=https://cliproxy.teknoir.cloud:8317/v1 -e OPENAI_API_KEY=... \
 #     -v t3home:/home/t3/.t3 -v "$PWD":/workspace t3code
 #
 # Installs the published npm package (pinned by T3CODE_VERSION) rather than building the

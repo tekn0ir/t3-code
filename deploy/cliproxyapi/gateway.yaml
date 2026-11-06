@@ -1,0 +1,57 @@
+# LAN-only listener: https://cliproxy.teknoir.cloud:8317 on the existing istio ingress gateway pods.
+#
+# Why a separate port instead of teknoir-gateway:443: the router forwards 80/443 (and the MQTT and
+# TURN ports) from the internet to r415, so anything routed on :443 is public. Port 8317 is not
+# forwarded, so this listener is reachable only from the LAN by network layout. Nothing here
+# depends on seeing the client IP (the k3s ServiceLB rewrites it with externalTrafficPolicy:
+# Cluster), and the LAN can be any set of subnets the router routes (192.168.1.0/24, 192.168.2.0/24).
+#
+# The edge login (oauth2-proxy ext_authz + Lua, gitops charts/auth) is attached to the :443
+# listener only, so this listener needs no bypass; the hub's own API key and management secret
+# authenticate callers.
+#
+# TLS: the existing *.teknoir.cloud wildcard certificate (cert-manager, istio-system). Envoy
+# reloads it on renewal.
+#
+# DNS: cliproxy.teknoir.cloud matches the public wildcard (the WAN address), where :8317 is closed.
+# LAN clients need it to resolve to r415, 192.168.2.166: add a host override on the router's DNS
+# (192.168.1.1) or an /etc/hosts entry (README.md, "DNS").
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: cliproxy-lan
+  namespace: cliproxy
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 8317
+        name: https-cliproxy
+        protocol: HTTPS
+      hosts:
+        - cliproxy.teknoir.cloud
+      tls:
+        mode: SIMPLE
+        # Secret in the gateway workload's namespace (istio-system).
+        credentialName: teknoir-cloud-wildcard-tls
+---
+# Opens :8317 on r415 (k3s ServiceLB binds it on the node) and sends it to the ingress gateway
+# pods. Lives in istio-system because a Service selects pods in its own namespace only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cliproxy-lan
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/name: cliproxyapi
+spec:
+  type: LoadBalancer
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+  ports:
+    - name: https-cliproxy
+      port: 8317
+      targetPort: 8317
+      protocol: TCP
