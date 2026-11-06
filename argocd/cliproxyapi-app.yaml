@@ -1,7 +1,11 @@
 # The Argo CD Application for the hub. Self-contained: it is NOT rendered by the gitops
 # app-of-apps (teknoir/platform-applications-gitops) and does not follow its staging releases.
-# Create it once with scripts/bootstrap-argocd.sh; from then on Argo CD syncs deploy/cliproxyapi
-# from this repository's `main` on its own.
+# Create it once with scripts/bootstrap-argocd.sh; from then on Argo CD syncs on its own.
+#
+# Source is the `deploy` branch, not main: .github/workflows/deploy-branch.yml publishes deploy/
+# there (git subtree split) on every push to main that touches deploy/. main carries the
+# src/* submodules, which Argo CD (submodules enabled) would check out recursively and fails on.
+# So the path is `cliproxyapi`, the branch root being the contents of deploy/.
 #
 # The gitops release guard (ValidatingAdmissionPolicy staging-release-guard) denies hand-made
 # CREATE/UPDATE/DELETE of Applications, so creating or changing THIS object needs break-glass on
@@ -23,8 +27,8 @@ spec:
     server: https://kubernetes.default.svc
   source:
     repoURL: https://github.com/tekn0ir/t3-code
-    path: deploy/cliproxyapi
-    targetRevision: main
+    path: cliproxyapi
+    targetRevision: deploy
   syncPolicy:
     syncOptions:
       - CreateNamespace=true
