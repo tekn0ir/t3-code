@@ -17,6 +17,7 @@ The OAuth providers redirect your browser to a **localhost** callback:
 |---|---|---|
 | Claude (Anthropic) | `http://localhost:54545/callback` | 54545 |
 | Codex (OpenAI) | `http://localhost:1455/auth/callback` | 1455 |
+| JetBrains AI (plugin) | `http://localhost:62345/?code=…` | none: paste it (2c) |
 
 The proxy runs in a pod, so forward those ports from the machine whose browser you log in with.
 The logins are written to the `cliproxyapi-auths` PVC (`/root/.cli-proxy-api`) and survive
@@ -48,6 +49,22 @@ which only reaches the pod through the 8317 forward.
    machine's browser that runs the port-forward.
 3. After the provider redirects to `localhost:<port>`, the port-forward delivers the callback to the
    pod and the new auth file appears in the list.
+
+## 2c. JetBrains AI (no port-forward)
+
+The `jetbrains-ai` plugin (`contrib/jetbrains-ai` in the fork) serves Claude models from a personal
+JetBrains AI Pro or Ultimate subscription.
+
+1. Open `https://cliproxy.teknoir.cloud:8317/management.html`, go to the OAuth page and pick
+   **JetBrains AI**.
+2. Sign in to your JetBrains Account in the window that opens.
+3. JetBrains then sends the browser to `http://localhost:62345/?code=…&state=…`, which does not load.
+   That is expected. Copy the whole address and paste it into the dashboard's callback field.
+
+The plugin finds the account's AI license, saves `jetbrains-ai-<email>.json`, and lists the
+account's Claude models under their usual ids (`claude-opus-5-5`, …). Those ids join the
+round-robin pool next to the Claude logins. When JetBrains reports the quota used up (HTTP 477),
+the account cools down until its quota resets and requests move to the next account.
 
 ## 2b. Log in from the CLI inside the pod
 

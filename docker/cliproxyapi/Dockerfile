@@ -9,6 +9,7 @@
 #   /CLIProxyAPI/CLIProxyAPI   binary (WORKDIR)
 #   /root/.cli-proxy-api       OAuth account logins (persistent volume)
 #   /CLIProxyAPI/logs          request/app logs
+#   /CLIProxyAPI/plugins       bundled plugins (jetbrains-ai.so), enabled in config.yaml
 # The Deployment passes -config pointing at a writable copy of the config Secret.
 
 FROM golang:1.26-bookworm AS builder
@@ -32,6 +33,13 @@ RUN CGO_ENABLED=1 GOOS=linux go build -buildvcs=false \
       -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" \
       -o ./CLIProxyAPI ./cmd/server/
 
+# The JetBrains AI plugin (contrib/jetbrains-ai in the fork) is a C ABI shared library loaded
+# from /CLIProxyAPI/plugins. It must come from this builder: same Go toolchain, same sdk.
+RUN cd contrib/jetbrains-ai \
+ && CGO_ENABLED=1 GOOS=linux go build -buildvcs=false -buildmode=c-shared -ldflags="-s -w" \
+      -o /app/plugins/jetbrains-ai.so . \
+ && rm -f /app/plugins/jetbrains-ai.h
+
 FROM debian:bookworm-slim
 
 ARG VERSION=dev
@@ -50,6 +58,7 @@ RUN apt-get update \
  && mkdir -p /CLIProxyAPI/logs /root/.cli-proxy-api
 
 COPY --from=builder /app/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
+COPY --from=builder /app/plugins /CLIProxyAPI/plugins
 COPY config.example.yaml /CLIProxyAPI/config.example.yaml
 
 WORKDIR /CLIProxyAPI
