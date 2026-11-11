@@ -26,4 +26,4 @@ images:
   - name: cliproxyapi
     newName: ghcr.io/tekn0ir/cliproxyapi
     # sha-<short> of this repo's commit, from .github/workflows/images.yml. Bump it to deploy a new build.
-    newTag: sha-b981623
+    newTag: sha-19df29c
